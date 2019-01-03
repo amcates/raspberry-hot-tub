@@ -1,13 +1,38 @@
 #!/usr/bin/python
 #import RPi.GPIO as GPIO
+import sqlite3
 import time
 import os
 import threading
 from threading import Timer
 
 ### code for accepting input from the push button to activate the filtration pump (aka jets)
-
-
+#
+#GPIO.setmode(GPIO.BCM)
+#
+#button_pin = "YOUR_PIN_GOES_HERE"
+#GPIO.setup(button_pin,GPIO.IN,pull_up_down=GPIO.PUD_UP)
+#
+#def isPressed(button_pin):
+#    now = time.time()
+#    if GPIO.input(button_pin) == False:
+#        time.sleep(DEBOUNCE)
+#        # wait for button release
+#        while not GPIO.input(button_pin):
+#            pass
+#    	return True
+#    return False
+#
+#def buttonPress(button_pin):
+#    if isPressed(button_pin):
+#	start_filtration(3600)
+#
+#def buttonRelease(channel):
+#    if not isPressed(button_pin):
+#        stop_filtration()
+#
+#GPIO.add_event_detect(button_pin,GPIO.RISING,callback=buttonPress)
+#GPIO.add_event_detect(button_pin,GPIO.FALLING,callback=buttonRelease)
 
 ### code for reading from temperature sensor (#TODO we will use 2 sensors so this will need to be modified)
 
@@ -84,7 +109,11 @@ if __name__ == '__main__':
     try:
         TEST_MODE = os.environ.get('TEST_MODE', 'false')
         TEST_SLEEP_SEC = 2
+        DEBOUNCE=0.2
         filtration_on = False
+
+	connection = sqlite3.connect("tub.db")
+        cursor = connection.cursor()
 
         if TEST_MODE == 'true':
             print("######## Starting TEST procedure #######\n")
