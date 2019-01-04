@@ -51,22 +51,21 @@ def read(ds18b20):
 ### code for running the pumps and heater
 
 def start_filtration():
-    global current_state
-
-    if current_state == 'filtration_on':
+    if get_state() == 'start_filtration':
         print("Filtration already on")
     else:
-        current_state = 'filtration_on'
+        change_state('start_filtration')
 
         print("Turning filtration pump on")
         # insert code to turn filtration on
 
-def stop_filtration():
-    global current_state
+    return "Filtration pump turned on"
 
-    current_state = None
+def stop_filtration():
+    change_state(None)
     print("Turning filtration pump off")
     # insert code to turn filtration off
+    return "Filtration pump turned off"
 
 def cycle_filtration(duration):
     start_filtration()
@@ -76,33 +75,38 @@ def cycle_filtration(duration):
 def start_circulation_pump():
     print("Turning circulation pump on")
     # insert code to turn circulation on
+    return "Circulation pump turned on"
 
 def stop_circulation_pump():
     print("Turning circulation pump off")
     # insert code to turn circulation off
+    return "Circulation pump turned off"
 
 def start_heater():
-    global current_state
-
+    change_state('start_heater')
     print("Turning on heater")
     # replace this with code to turn heater on
+    return "Heater turned on"
 
 def stop_heater():
     print("Turning off heater")
     # replace this with code to turn heater off
+    return "Heater turned off"
 
 ### logic to determine how the system responds to different temperatures
 
-def determine_action(current_temp=104):
-    global current_state, threaded_timer
+def determine_action():
+    global threaded_timer
+    
+    current_temp = get_temp()
 
     print("Current temp is " + str(current_temp))
-    current_state = 'heating'
+    change_state('heating')
     pause_between_checks = TEST_SLEEP_FOR if TEST_MODE else PAUSE_BETWEEN_CHECKS_FOR
 
     if current_temp >= 104:
         print("Temperature is good, nothing to do")
-        stop_all()
+        system_reset()
         print("Waiting " + str(pause_between_checks) + " seconds before we check again")
         time.sleep(pause_between_checks) # temp is good, we should wait a little while before we check again
     elif current_temp < 96:
@@ -115,14 +119,14 @@ def determine_action(current_temp=104):
         delay = TEST_SLEEP_FOR if TEST_MODE else SHORT_RUN
         print("Temperature is between 100 and 103, running for " + str(delay) + " seconds")
 
-    if current_state == 'heating':
+    if get_state() == 'start_heater':
         start_circulation_pump()
         start_heater()
         if TEST_MODE: 
             time.sleep(delay)
-            stop_all()
+            system_reset()
         else:
-            threaded_timer = delayed_stop(stop_all, delay)
+            threaded_timer = delayed_stop(system_reset, delay)
 
 def delayed_stop(func, timeout):
    def func_wrapper(): func()
@@ -132,10 +136,8 @@ def delayed_stop(func, timeout):
 
    return t 
 
-def stop_all():
-    global threaded_timer, shutdown_server
-
-    shutdown_server = True
+def system_reset():
+    global threaded_timer
 
     if threaded_timer: threaded_timer.cancel() 
 
@@ -145,18 +147,61 @@ def stop_all():
 
     reset_state()
 
+    return "All systems stopped and state reset"
+
 def reset_state():
-    global current_state
+    change_state(None)
     print("Resetting current_state to None")
-    current_state = None
+    return "System state set to None"
+
+def system_off():
+    change_state('system_off')
+    print("Turning the system off")
+    return "System turned off"
+
+def get_temp():
+    current_temp = None
+    if read("temperature.txt") != None:
+        current_temp = read("temperature.txt")
+    return current_temp
+
+def change_state(new_state):
+    global current_state
+    print(f'State changed from {current_state} to {new_state}')
+    current_state = new_state
+
+def get_state():
+    global current_state
+    return current_state
 
 ### listening server handler
 def handle(clientsocket, address):
+    commands = ['start_filtration', 'stop_filtration', 'start_heater', 'stop_heater', 'system_reset', 'system_off', 'get_temp']
+    command_dict = {'start_filtration' : start_filtration,
+                    'stop_filtration'  : stop_filtration,
+                    'start_heater'     : start_heater,
+                    'stop_heater'      : stop_heater,
+                    'system_reset'     : system_reset,
+                    'system_off'       : system_off,
+                    'get_temp'         : get_temp,
+                }
     try:
+        print('Connection: ', address)
         while 1:
             buf = clientsocket.recv(MAX_LENGTH)
             if buf == '': return #client terminated connection
-            print(buf.decode('utf-8'))
+            
+            command = buf.decode('utf-8')
+            if command in commands:
+                resp = command_dict[command]()
+                valid = f'Command Received: {command} Response: {resp}'
+                print(valid)
+                clientsocket.send(valid.encode('utf-8'))
+            else:
+                invalid = f'Invalid Command: {command}'
+                print(invalid)
+                clientsocket.send(invalid.encode('utf-8'))
+                
             break
     finally:
         clientsocket.close()
@@ -164,7 +209,7 @@ def handle(clientsocket, address):
 
 ### exit application
 def kill():
-    stop_all()
+    system_reset()
     quit()
 
 if __name__ == '__main__':
@@ -176,29 +221,25 @@ if __name__ == '__main__':
         TEST_SLEEP_FOR = 3
 
         # how long do we wait between checks when the temperature is 104+
-        PAUSE_BETWEEN_CHECKS_FOR = 20
+        PAUSE_BETWEEN_CHECKS_FOR = 2 #20
 
         # how long to cycle filtration before we check the temperature
-        CYCLE_FILTRATION_FOR = 20
+        CYCLE_FILTRATION_FOR = 2 #20
 
         # debounce time for push buttons
         DEBOUNCE = 0.2
 
         # how long the heater will run under certain conditions, see def determine_action
-        LONG_RUN  = 5400
-        MED_RUN   = 3600
-        SHORT_RUN = 1800
+        LONG_RUN  = 2 #5400
+        MED_RUN   = 2 #3600
+        SHORT_RUN = 2 #1800
 
         # configuration for server listening for commands
         MAX_LENGTH = 4096
         PORT = 10000
         HOST = '127.0.0.1'
-
-        # server socket for listener
-        shutdown_server = False
-        serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        serversocket.bind((HOST, PORT))
-        serversocket.listen(10)
+        TIMEOUT = 2
+        LISTEN = 10
 
         # current state of the system, [None, filtration_on, heating]
         current_state = None
@@ -208,7 +249,14 @@ if __name__ == '__main__':
 
         ### make sure all systems are off when first starting up ###
         print("################### System Startup #####################")
-        stop_all()
+        system_reset()
+
+        print("Starting up listening server")
+        serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        serversocket.bind((HOST, PORT))
+        serversocket.settimeout(TIMEOUT)
+        serversocket.listen(LISTEN)
+
         print("\n")
         
         if TEST_MODE == True:
@@ -226,21 +274,23 @@ if __name__ == '__main__':
             print("######### Starting to monitor for commands and  temperature ########")
             while 1:
                 #accept connections from outside
-                (clientsocket, address) = serversocket.accept()
+                try:
+                    (clientsocket, address) = serversocket.accept()
 
-                client_thread = threading.Thread(target=handle, args=(clientsocket,address))
-                client_thread.daemon = True
-                client_thread.start()
-
-                if False: #current_state == None:
-                    #Heat Mode (we want 104)
-                    cycle_filtration(CYCLE_FILTRATION_FOR)
- 
-                    if read("temperature.txt") != None:
-                        current_temp = read("temperature.txt")
-                        determine_action(current_temp)
-                    else:
-                        stop_all()
+                    client_thread = threading.Thread(target=handle, args=(clientsocket,address))
+                    client_thread.daemon = True
+                    client_thread.start()
+                except socket.timeout:
+                    if get_state() == None:
+                        #Heat Mode (we want 104)
+                        cycle_filtration(CYCLE_FILTRATION_FOR)
+     
+                        if get_temp():
+                            determine_action()
+                        else:
+                            system_reset()
+                except:
+                    kill()
 
     except KeyboardInterrupt:
         kill()
