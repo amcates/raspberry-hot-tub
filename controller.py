@@ -67,6 +67,11 @@ def stop_filtration():
     print("Turning filtration pump off")
     # insert code to turn filtration off
 
+def cycle_filtration(duration):
+    start_filtration()
+    time.sleep(duration) 
+    stop_filtration()
+
 def start_circulation_pump():
     print("Turning circulation pump on")
     # insert code to turn circulation on
@@ -92,7 +97,7 @@ def determine_action(current_temp=104):
 
     print("Current temp is " + str(current_temp))
     current_state = 'heating'
-    pause_between_checks = TEST_SLEEP_SEC if TEST_MODE else PAUSE_BETWEEN_CHECKS
+    pause_between_checks = TEST_SLEEP_FOR if TEST_MODE else PAUSE_BETWEEN_CHECKS_FOR
 
     if current_temp >= 104:
         print("Temperature is good, nothing to do")
@@ -100,13 +105,13 @@ def determine_action(current_temp=104):
         print("Waiting " + str(pause_between_checks) + " seconds before we check again")
         time.sleep(pause_between_checks) # temp is good, we should wait a little while before we check again
     elif current_temp < 96:
-        delay = TEST_SLEEP_SEC if TEST_MODE else LONG_RUN
+        delay = TEST_SLEEP_FOR if TEST_MODE else LONG_RUN
         print("Temperature is less than 96, running for " + str(delay) + " seconds")
     elif 96 <= current_temp <= 99:
-        delay = TEST_SLEEP_SEC if TEST_MODE else MED_RUN
+        delay = TEST_SLEEP_FOR if TEST_MODE else MED_RUN
         print("Temperature is between 98 and 100, running for " + str(delay) + " seconds")
     elif 100 <= current_temp <= 103:
-        delay = TEST_SLEEP_SEC if TEST_MODE else SHORT_RUN
+        delay = TEST_SLEEP_FOR if TEST_MODE else SHORT_RUN
         print("Temperature is between 100 and 103, running for " + str(delay) + " seconds")
 
     if current_state == 'heating':
@@ -148,13 +153,17 @@ def kill():
 
 if __name__ == '__main__':
     try:
+	## NOTE ALL TIMES ARE IN SECONDS
 
 	# usage: TEST_MODE=true python controller.py
         TEST_MODE = True if os.environ.get('TEST_MODE', 'false') == 'true' else False
-        TEST_SLEEP_SEC = 3
+        TEST_SLEEP_FOR = 3
 
 	# how long do we wait between checks when the temperature is 104+
-	PAUSE_BETWEEN_CHECKS = 20
+	PAUSE_BETWEEN_CHECKS_FOR = 20
+
+	# how long to cycle filtration before we check the temperature
+        CYCLE_FILTRATION_FOR = 20
 
 	# debounce time for push buttons
         DEBOUNCE = 0.2
@@ -181,9 +190,7 @@ if __name__ == '__main__':
             for current_temp in [104, 102, 97, 95]:
                 print("Starting procedure for " + str(current_temp))
                 print("--------------------------")
-                start_filtration()
-		time.sleep(TEST_SLEEP_SEC) 
-                stop_filtration()
+		cycle_filtration(TEST_SLEEP_FOR)
                 determine_action(current_temp)
                 print("\n")
 
@@ -193,9 +200,7 @@ if __name__ == '__main__':
             while True:
 		if current_state == None:
                     #Heat Mode (we want 104)
-                    start_filtration()
-		    time.sleep(20)
-                    stop_filtration()
+		    cycle_filtration(CYCLE_FILTRATION_FOR)
  
                     if read("temperature.txt") != None:
                         current_temp = read("temperature.txt")
