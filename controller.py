@@ -1,10 +1,9 @@
 #!/usr/bin/python
 #import RPi.GPIO as GPIO
-import sqlite3
-import time
-import os
 import threading
-from threading import Timer
+import time
+import datetime
+import os
 
 ### code for accepting input from the push button to activate the filtration pump (aka jets)
 #
@@ -50,93 +49,159 @@ def read(ds18b20):
 
 ### code for running the pumps and heater
 
-def start_filtration(sec=20):
-    global filtration_on
+def start_filtration():
+    global current_state
 
-    if filtration_on == True:
-        print("Filtration already on\n")
+    if current_state == 'filtration_on':
+        print("Filtration already on")
     else:
-        filtration_on = True
+        current_state = 'filtration_on'
 
-        print("Running filtration pump for " + str(sec) + " seconds")
-        time.sleep(sec) if TEST_MODE == 'false' else time.sleep(TEST_SLEEP_SEC)
-
-        stop_filtration()
+        print("Turning filtration pump on")
+        # insert code to turn filtration on
 
 def stop_filtration():
-    global filtration_on
-    filtration_on = False
-    print("Turning filtration pump off\n")
+    global current_state
+
+    current_state = None
+    print("Turning filtration pump off")
+    # insert code to turn filtration off
 
 def start_circulation_pump():
     print("Turning circulation pump on")
+    # insert code to turn circulation on
 
 def stop_circulation_pump():
     print("Turning circulation pump off")
+    # insert code to turn circulation off
 
-def run_heater(sec=0):
-    start_circulation_pump()
-    print("Running heater for " + str(sec) + " seconds")
-    time.sleep(sec) if TEST_MODE == 'false' else time.sleep(TEST_SLEEP_SEC)
+def start_heater():
+    global current_state
+
+    print("Turning on heater")
+    # replace this with code to turn heater on
+
+def stop_heater():
     print("Turning off heater")
-    stop_circulation_pump()
+    # replace this with code to turn heater off
 
 ### logic to determine how the system responds to different temperatures
 
 def determine_action(current_temp=104):
+    global current_state, threaded_timer
+
     print("Current temp is " + str(current_temp))
+    current_state = 'heating'
+    pause_between_checks = TEST_SLEEP_SEC if TEST_MODE else PAUSE_BETWEEN_CHECKS
 
     if current_temp >= 104:
-        print("Temperature is good, sleeping for 1.5 hrs\n")
-        time.sleep(5400) if TEST_MODE == 'false' else time.sleep(TEST_SLEEP_SEC)
+        print("Temperature is good, nothing to do")
+        stop_all()
+        print("Waiting " + str(pause_between_checks) + " seconds before we check again")
+        time.sleep(pause_between_checks) # temp is good, we should wait a little while before we check again
     elif current_temp < 96:
-        print("Temperature is less than 96, running for 1.5 hrs\n")
-        run_heater(5400)
-        print("")
+        delay = TEST_SLEEP_SEC if TEST_MODE else LONG_RUN
+        print("Temperature is less than 96, running for " + str(delay) + " seconds")
     elif 96 <= current_temp <= 99:
-        print("Temperature is between 98 and 100, running for 1 hr\n")
-        run_heater(3600)
-        print("")
+        delay = TEST_SLEEP_SEC if TEST_MODE else MED_RUN
+        print("Temperature is between 98 and 100, running for " + str(delay) + " seconds")
     elif 100 <= current_temp <= 103:
-        print("Temperature is between 100 and 103, running for 30 min\n")
-        run_heater(1800)
-        print("")
+        delay = TEST_SLEEP_SEC if TEST_MODE else SHORT_RUN
+        print("Temperature is between 100 and 103, running for " + str(delay) + " seconds")
+
+    if current_state == 'heating':
+	start_circulation_pump()
+        start_heater()
+        if TEST_MODE: 
+	    time.sleep(delay)
+            stop_all()
+	else:
+            threaded_timer = delayed_stop(stop_all, delay)
+
+def delayed_stop(func, timeout):
+   def func_wrapper(): func()
+
+   t = threading.Timer(timeout, func_wrapper, ())
+   t.start()
+
+   return t 
+
+def stop_all():
+    global threaded_timer
+
+    if threaded_timer: threaded_timer.cancel() 
+
+    stop_heater()
+    stop_filtration()
+    stop_circulation_pump()
+
+    reset_state()
+
+def reset_state():
+    global current_state
+    print("Resetting current_state to None")
+    current_state = None
 
 def kill():
+    stop_all()
     quit()
 
 if __name__ == '__main__':
     try:
-        TEST_MODE = os.environ.get('TEST_MODE', 'false')
-        TEST_SLEEP_SEC = 2
-        DEBOUNCE=0.2
-        filtration_on = False
 
-	connection = sqlite3.connect("tub.db")
-        cursor = connection.cursor()
+	# usage: TEST_MODE=true python controller.py
+        TEST_MODE = True if os.environ.get('TEST_MODE', 'false') == 'true' else False
+        TEST_SLEEP_SEC = 3
 
-        if TEST_MODE == 'true':
-            print("######## Starting TEST procedure #######\n")
+	# how long do we wait between checks when the temperature is 104+
+	PAUSE_BETWEEN_CHECKS = 20
+
+	# debounce time for push buttons
+        DEBOUNCE = 0.2
+
+	# how long the heater will run under certain conditions, see def determine_action
+	LONG_RUN  = 5400
+        MED_RUN   = 3600
+        SHORT_RUN = 1800
+
+	# current state of the system, [None, filtration_on, heating]
+        current_state = None
+
+	# threaded timer used in def delayed_stop
+        threaded_timer = None
+
+	### make sure all systems are off when first starting up ###
+        print("################### System Startup #####################")
+        stop_all()
+        print("\n")
+	
+        if TEST_MODE == True:
+            print("############### Starting TEST procedure ###############")
 
             for current_temp in [104, 102, 97, 95]:
                 print("Starting procedure for " + str(current_temp))
-                print("-----------------------------------------")
+                print("--------------------------")
                 start_filtration()
+		time.sleep(TEST_SLEEP_SEC) 
+                stop_filtration()
                 determine_action(current_temp)
                 print("\n")
 
-            print("########  End TEST ########")
+            print("################### End TEST ########################")
         else:
+            print("############ Starting to monitor temperature ############")
             while True:
-                #Heat Mode (we want 104)
-                print("Starting procedure for " + str(current_temp))
-                print("-----------------------------------------")
-                start_filtration(20)
-
-                if read("temperature.txt") != None:
-                    current_temp = read("temperature.txt")
-                    determine_action(current_temp)
-                print("\n\n")
+		if current_state == None:
+                    #Heat Mode (we want 104)
+                    start_filtration()
+		    time.sleep(20)
+                    stop_filtration()
+ 
+                    if read("temperature.txt") != None:
+                        current_temp = read("temperature.txt")
+                        determine_action(current_temp)
+	    	    else:
+    		        stop_all()
 
     except KeyboardInterrupt:
         kill()

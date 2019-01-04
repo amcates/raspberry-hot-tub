@@ -1,13 +1,9 @@
-import threading
+import time
 
-ready = False
+print(time.strftime("%Y%m%d%H%M%S", time.gmtime()))
 
-cv = threading.Condition()
-
-with cv:
-    while not ready:
-        cv.wait()
-    print("I'm ready")
-
-with cv:
-    ready = True
+import datetime
+x= datetime.datetime.now()
+y = x + datetime.timedelta(0,3600)
+print(x.strftime("%Y%m%d%H%M%S"))
+print(y.strftime("%Y%m%d%H%M%S"))
