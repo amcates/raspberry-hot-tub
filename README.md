@@ -27,8 +27,8 @@ The reasoning for the way it runs is that pumps/sensors have been off lately.  I
 
 ## Requirements/Installation
 
-python 2.7 or above
-RPi.GPIO
+* python 2.7 or above
+* RPi.GPIO
 
 git clone https://github.com/amcates/raspberry-hot-tub.git
 
