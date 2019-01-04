@@ -5,6 +5,7 @@ import socket
 import time
 import datetime
 import os
+import json
 
 ### code for accepting input from the push button to activate the filtration pump (aka jets)
 #
@@ -163,7 +164,11 @@ def get_temp():
     current_temp = None
     if read("temperature.txt") != None:
         current_temp = read("temperature.txt")
-    return current_temp
+    return json_value("get_temp", current_temp)
+
+def json_value(attr, value):
+    x = {attr: value}
+    return json.dumps(x)
 
 def change_state(new_state):
     global current_state
@@ -196,7 +201,7 @@ def handle(clientsocket, address):
                 resp = command_dict[command]()
                 valid = f'Command Received: {command} Response: {resp}'
                 print(valid)
-                clientsocket.send(valid.encode('utf-8'))
+                clientsocket.send(resp.encode('utf-8'))
             else:
                 invalid = f'Invalid Command: {command}'
                 print(invalid)
@@ -281,7 +286,7 @@ if __name__ == '__main__':
                     client_thread.daemon = True
                     client_thread.start()
                 except socket.timeout:
-                    if get_state() == None:
+                    if get_state() == False: #None:
                         #Heat Mode (we want 104)
                         cycle_filtration(CYCLE_FILTRATION_FOR)
      

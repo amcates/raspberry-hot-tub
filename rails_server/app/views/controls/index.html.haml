@@ -1,0 +1,12 @@
+%header.bar.bar-nav
+  %h1.title
+    Hot Springs Controls v1.0
+
+%nav.bar.bar-tab
+  = link_to '#', class: 'tab-item active' do
+    %span.icon.icon-info
+    %span.tab-label Current Temp
+
+.content
+  %p.content-padded
+    %canvas#canvas-id

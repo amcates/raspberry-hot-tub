@@ -1,0 +1,8 @@
+{
+  "name": "rails_server",
+  "private": true,
+  "dependencies": {
+    "canvas-gauges": "^2.1.5",
+    "jquery": "^3.3.1"
+  }
+}
