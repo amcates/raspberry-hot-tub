@@ -25,6 +25,14 @@ The reasoning for the way it runs is that pumps/sensors have been off lately.  I
 8. wait 1.5 hrs then repeat step 1
 
 
+## Requirements/Installation
+
+python 2.7 or above
+RPi.GPIO
+
+git clone https://github.com/amcates/raspberry-hot-tub.git
+
+## Usage
 
 Normal operation:
 python controller.rb
