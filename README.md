@@ -13,7 +13,7 @@ The reasoning for the way it runs is that pumps/sensors have been off lately.  I
 7. start over at step 1
 8. wait 1.5 hrs then repeat step 1
 
-## Away Mode (we want 98)
+## Away Mode (we want 98) *** NOT YET IMPLEMENTED
 
 1. run filtration pump (main pump for 20 seconds)
 2. read input from temperature sensors
@@ -25,3 +25,17 @@ The reasoning for the way it runs is that pumps/sensors have been off lately.  I
 8. wait 1.5 hrs then repeat step 1
 
 
+## Requirements/Installation
+
+* python 2.7 or above
+* RPi.GPIO
+
+git clone https://github.com/amcates/raspberry-hot-tub.git
+
+## Usage
+
+Normal operation:
+python controller.rb
+
+Test mode:
+TEST_MODE=true python controller.rb
