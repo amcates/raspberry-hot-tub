@@ -52,6 +52,11 @@ def read(ds18b20):
 ### code for running the pumps and heater
 
 def start_filtration():
+    # make sure the other systems are off first
+    if get_state() == 'start_heater':
+        stop_heater()
+        stop_circulation_pump()
+
     if get_state() == 'start_filtration':
         print("Filtration already on")
     else:
@@ -63,7 +68,7 @@ def start_filtration():
     return "Filtration pump turned on"
 
 def stop_filtration():
-    change_state(None)
+    #change_state(None)
     print("Turning filtration pump off")
     # insert code to turn filtration off
     return "Filtration pump turned off"
@@ -101,8 +106,11 @@ def determine_action():
     
     current_temp = get_temp()
 
+    if get_state() == 'start_filtration':
+        stop_filtration()
+
     print("Current temp is " + str(current_temp))
-    change_state('heating')
+    change_state('start_heater')
     pause_between_checks = TEST_SLEEP_FOR if TEST_MODE else PAUSE_BETWEEN_CHECKS_FOR
 
     if current_temp >= 104:
@@ -130,12 +138,12 @@ def determine_action():
             threaded_timer = delayed_stop(system_reset, delay)
 
 def delayed_stop(func, timeout):
-   def func_wrapper(): func()
+    def func_wrapper(): func()
 
-   t = threading.Timer(timeout, func_wrapper, ())
-   t.start()
+    t = threading.Timer(timeout, func_wrapper, ())
+    t.start()
 
-   return t 
+    return t 
 
 def system_reset():
     global threaded_timer
@@ -162,9 +170,14 @@ def system_off():
 
 def get_temp():
     current_temp = None
-    if read("temperature.txt") != None:
-        current_temp = read("temperature.txt")
-    return json_value("get_temp", current_temp)
+
+    if TEST_MODE:
+        current_temp = current_test_temp
+    else:
+        current_temp = None
+        if read("temperature.txt") != None:
+            current_temp = read("temperature.txt")
+    return current_temp
 
 def json_value(attr, value):
     x = {attr: value}
@@ -176,19 +189,19 @@ def change_state(new_state):
     current_state = new_state
 
 def get_state():
-    global current_state
     return current_state
 
 ### listening server handler
 def handle(clientsocket, address):
-    commands = ['start_filtration', 'stop_filtration', 'start_heater', 'stop_heater', 'system_reset', 'system_off', 'get_temp']
+    commands = ['start_filtration', 'stop_filtration', 'start_heater', 'stop_heater', 'system_reset', 'system_off', 'get_temp', 'get_state']
     command_dict = {'start_filtration' : start_filtration,
                     'stop_filtration'  : stop_filtration,
-                    'start_heater'     : start_heater,
+                    'start_heater'     : determine_action,
                     'stop_heater'      : stop_heater,
                     'system_reset'     : system_reset,
                     'system_off'       : system_off,
                     'get_temp'         : get_temp,
+                    'get_state'        : get_state,
                 }
     try:
         print('Connection: ', address)
@@ -201,7 +214,7 @@ def handle(clientsocket, address):
                 resp = command_dict[command]()
                 valid = f'Command Received: {command} Response: {resp}'
                 print(valid)
-                clientsocket.send(resp.encode('utf-8'))
+                clientsocket.send(str(resp).encode('utf-8'))
             else:
                 invalid = f'Invalid Command: {command}'
                 print(invalid)
@@ -224,20 +237,21 @@ if __name__ == '__main__':
         # usage: TEST_MODE=true python controller.py
         TEST_MODE = True if os.environ.get('TEST_MODE', 'false') == 'true' else False
         TEST_SLEEP_FOR = 3
+        current_test_temp = None
 
         # how long do we wait between checks when the temperature is 104+
-        PAUSE_BETWEEN_CHECKS_FOR = 2 #20
+        PAUSE_BETWEEN_CHECKS_FOR = 1800
 
         # how long to cycle filtration before we check the temperature
-        CYCLE_FILTRATION_FOR = 2 #20
+        CYCLE_FILTRATION_FOR = 20
 
         # debounce time for push buttons
         DEBOUNCE = 0.2
 
         # how long the heater will run under certain conditions, see def determine_action
-        LONG_RUN  = 2 #5400
-        MED_RUN   = 2 #3600
-        SHORT_RUN = 2 #1800
+        LONG_RUN  = 5400
+        MED_RUN   = 3600
+        SHORT_RUN = 1800
 
         # configuration for server listening for commands
         MAX_LENGTH = 4096
@@ -246,7 +260,7 @@ if __name__ == '__main__':
         TIMEOUT = 2
         LISTEN = 10
 
-        # current state of the system, [None, filtration_on, heating]
+        # current state of the system, [None, start_filtration, start_heater, system_off]
         current_state = None
 
         # threaded timer used in def delayed_stop
@@ -271,7 +285,8 @@ if __name__ == '__main__':
                 print("Starting procedure for " + str(current_temp))
                 print("--------------------------")
                 cycle_filtration(TEST_SLEEP_FOR)
-                determine_action(current_temp)
+                current_test_temp = current_temp
+                determine_action()
                 print("\n")
 
             print("################### End TEST ########################")
@@ -286,7 +301,7 @@ if __name__ == '__main__':
                     client_thread.daemon = True
                     client_thread.start()
                 except socket.timeout:
-                    if get_state() == False: #None:
+                    if get_state() == None:
                         #Heat Mode (we want 104)
                         cycle_filtration(CYCLE_FILTRATION_FOR)
      

@@ -3,10 +3,13 @@
     Hot Springs Controls v1.0
 
 %nav.bar.bar-tab
-  = link_to '#', class: 'tab-item active' do
+  = link_to '#', class: 'tab-item' do
     %span.icon.icon-info
     %span.tab-label Current Temp
 
 .content
   %p.content-padded
     %canvas#canvas-id
+
+    .bar.bar-standard.bar-footer-secondary
+      %button{id: 'state-button', class: "btn #{@state[1]} btn-block"}= @state[0]

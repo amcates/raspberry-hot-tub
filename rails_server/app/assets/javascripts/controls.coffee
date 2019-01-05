@@ -35,3 +35,15 @@ $ ->
         }
     ]
   }).draw();
+
+  refreshGauge = (data) ->
+    gauge = document.gauges.get('canvas-id')
+    gauge.value = data
+
+  updateState = (data) ->
+    $('#state-button').removeClass()
+    $('#state-button').html(data[0])
+    $('#state-button').addClass('btn').addClass(data[1]).addClass('btn-block')
+
+  gon.watch('current_temp', interval: 20000, url: '/controls', refreshGauge)
+  gon.watch('current_state', interval: 20000, url: '/controls', updateState)

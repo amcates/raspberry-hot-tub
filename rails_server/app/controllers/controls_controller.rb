@@ -1,6 +1,9 @@
 class ControlsController < ApplicationController
   def index
-    response = Client.send_msg('get_temp')
-    gon.push current_temp: response['get_temp']
+    temp = Client.send_msg('get_temp')
+    @state = Client::STATE_TRANSLATION[Client.send_msg('get_state')]
+
+    gon.watch.current_temp = temp
+    gon.watch.current_state = @state
   end
 end
