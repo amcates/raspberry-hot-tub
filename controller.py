@@ -110,7 +110,7 @@ def determine_action():
         stop_filtration()
 
     print("Current temp is " + str(current_temp))
-    change_state('start_heater')
+    change_state('start_heater') #TODO Does this need to be here, in order for the below code to work it does
     pause_between_checks = TEST_SLEEP_FOR if TEST_MODE else PAUSE_BETWEEN_CHECKS_FOR
 
     if current_temp >= 104:
@@ -164,6 +164,7 @@ def reset_state():
     return "System state set to None"
 
 def system_off():
+    system_reset()
     change_state('system_off')
     print("Turning the system off")
     return "System turned off"
@@ -195,9 +196,9 @@ def get_state():
 def handle(clientsocket, address):
     commands = ['start_filtration', 'stop_filtration', 'start_heater', 'stop_heater', 'system_reset', 'system_off', 'get_temp', 'get_state']
     command_dict = {'start_filtration' : start_filtration,
-                    'stop_filtration'  : stop_filtration,
+                    'stop_filtration'  : system_reset,
                     'start_heater'     : determine_action,
-                    'stop_heater'      : stop_heater,
+                    'stop_heater'      : system_off,
                     'system_reset'     : system_reset,
                     'system_off'       : system_off,
                     'get_temp'         : get_temp,
