@@ -2,8 +2,11 @@
   %h1.title
     Hot Springs Controls v1.0
 
+.bar.bar-standard.bar-header-secondary
+  %button.btn.btn-block.message Awaiting input
+
 %nav.bar.bar-tab
-  = link_to '#', class: 'tab-item' do
+  = link_to "javascript:void(0);", id: 'fetch-temp', class: 'tab-item active' do
     %span.icon.icon-info
     %span.tab-label Current Temp
 

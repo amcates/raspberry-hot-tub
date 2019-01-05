@@ -45,5 +45,24 @@ $ ->
     $('#state-button').html(data[0])
     $('#state-button').addClass('btn').addClass(data[1]).addClass('btn-block')
 
-  gon.watch('current_temp', interval: 20000, url: '/controls', refreshGauge)
-  gon.watch('current_state', interval: 20000, url: '/controls', updateState)
+  resetMessage = ->
+    $('.message').html('Awaiting input')
+    $('.message').fadeIn(1000)
+
+  fetchTemp = ->
+    $.get "/controls?_method=GET&gon_return_variable=true&gon_watched_variable=current_temp", (data) ->
+      refreshGauge(data)
+    .done ->
+      $('.message').fadeOut 1000, resetMessage
+
+  $('#fetch-temp').click ->
+    $('.message').fadeOut 1000, ->
+      $('.message').html("Fetching Current Temperature")
+      $('.message').fadeIn 1000
+      fetchTemp()
+
+  #TODO Uncomment when ready to go live, this is commented out so for testing purposes
+  #gon.watch('current_temp', interval: 20000, url: '/controls', refreshGauge)
+  #gon.watch('current_state', interval: 20000, url: '/controls', updateState)
+
+  
