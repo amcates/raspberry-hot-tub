@@ -6,4 +6,12 @@ class ControlsController < ApplicationController
     gon.watch.current_temp = temp
     gon.watch.current_state = @state
   end
+
+  def send_command
+    command = params[:command]
+    @resp = Client.send_msg(command)
+    respond_to do |format|
+      format.json { render json: @resp.to_json }
+    end
+  end
 end

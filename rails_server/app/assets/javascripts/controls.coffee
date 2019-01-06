@@ -14,8 +14,7 @@ $ ->
     height: '360'
     highlights: [
         {
-            "from": 0,
-            "to": 90,
+            "from": 0, "to": 90,
             "color": "rgba(0,0, 255, .3)"
         },
         {
@@ -53,16 +52,54 @@ $ ->
     $.get "/controls?_method=GET&gon_return_variable=true&gon_watched_variable=current_temp", (data) ->
       refreshGauge(data)
     .done ->
-      $('.message').fadeOut 1000, resetMessage
+      $('.message').fadeOut(1000, resetMessage)
 
-  $('#fetch-temp').click ->
+  sendCommand = (command) ->
+    $.get "/controls/send_command?_method=GET&command=#{command}", (data) ->
+      $.get "/controls?_method=GET&gon_return_variable=true&gon_watched_variable=current_state", (data) ->
+        updateState(data)
+    , 'json'
+    .done ->
+      $('.message').fadeOut(1000, resetMessage)
+
+  $('.fetch-temp').click ->
     $('.message').fadeOut 1000, ->
       $('.message').html("Fetching Current Temperature")
-      $('.message').fadeIn 1000
+      $('.message').fadeIn(1000)
       fetchTemp()
 
+  $('.tab-item').click ->
+      $(this).addClass('active')
+      window.setTimeout =>
+        $(this).removeClass('active')
+      , 400
+
+  $('.start-heater').click ->
+    $('.message').fadeOut 1000, ->
+      $('.message').html("Turning Heater On")
+      $('.message').fadeIn(1000)
+      sendCommand('start_heater')
+
+  $('.start-filtration').click ->
+    $('.message').fadeOut 1000, ->
+      $('.message').html("Turning Jets On")
+      $('.message').fadeIn(1000)
+      sendCommand('start_filtration')
+  
+  $('.stop-filtration').click ->
+    $('.message').fadeOut 1000, ->
+      $('.message').html("Turning Jets Off")
+      $('.message').fadeIn(1000)
+      sendCommand('start_heater')
+  
+  $('.system-off').click ->
+    $('.message').fadeOut 1000, ->
+      $('.message').html("Turning System Off")
+      $('.message').fadeIn(1000)
+      sendCommand('system_off')
+
   #TODO Uncomment when ready to go live, this is commented out so for testing purposes
-  #gon.watch('current_temp', interval: 20000, url: '/controls', refreshGauge)
-  #gon.watch('current_state', interval: 20000, url: '/controls', updateState)
+  gon.watch('current_temp', interval: 20000, url: '/controls', refreshGauge)
+  gon.watch('current_state', interval: 20000, url: '/controls', updateState)
 
   

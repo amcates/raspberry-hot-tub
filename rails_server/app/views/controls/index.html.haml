@@ -6,9 +6,21 @@
   %button.btn.btn-block.message Awaiting input
 
 %nav.bar.bar-tab
-  = link_to "javascript:void(0);", id: 'fetch-temp', class: 'tab-item active' do
+  = link_to "javascript:void(0);", class: 'tab-item start-filtration' do
+    %span.icon.icon-play
+    %span.tab-label Jets On
+  = link_to "javascript:void(0);", class: 'tab-item stop-filtration' do
+    %span.icon.icon-pause
+    %span.tab-label Jets Off
+  = link_to "javascript:void(0);", class: 'tab-item fetch-temp' do
     %span.icon.icon-info
     %span.tab-label Current Temp
+  = link_to "javascript:void(0);", class: 'tab-item start-heater' do
+    %span.icon.icon-gear
+    %span.tab-label Heat
+  = link_to "javascript:void(0);", class: 'tab-item system-off' do
+    %span.icon.icon-close
+    %span.tab-label System Off
 
 .content
   %p.content-padded

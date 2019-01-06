@@ -7,6 +7,53 @@ import datetime
 import os
 import json
 
+### code for 4 channel relay
+#
+#GPIO.setmode(GPIO.BCM)
+#
+## init list with pin numbers
+#
+#pinList = [2, 3, 4, 17]
+#
+## loop through pins and set mode and state to 'high'
+#
+#for i in pinList:
+#    GPIO.setup(i, GPIO.OUT)
+#    GPIO.output(i, GPIO.HIGH)
+#
+## time to sleep between operations in the main loop
+#
+#SleepTimeL = 2
+#
+## main loop
+#
+#try:
+#  GPIO.output(2, GPIO.LOW)
+#  print "ONE"
+#  time.sleep(SleepTimeL);
+#  GPIO.output(3, GPIO.LOW)
+#  print "TWO"
+#  time.sleep(SleepTimeL);
+#  GPIO.output(4, GPIO.LOW)
+#  print "THREE"
+#  time.sleep(SleepTimeL);
+#  GPIO.output(17, GPIO.LOW)
+#  print "FOUR"
+#  time.sleep(SleepTimeL);
+#  GPIO.cleanup()
+#  print "Good bye!"
+#
+## End program cleanly with keyboard
+#except KeyboardInterrupt:
+#  print "  Quit"
+#
+#  # Reset GPIO settings
+#  GPIO.cleanup()
+#
+#
+## find more information on this script at
+## http://youtu.be/WpM1aq4B8-A
+
 ### code for accepting input from the push button to activate the filtration pump (aka jets)
 #
 #GPIO.setmode(GPIO.BCM)
@@ -54,8 +101,7 @@ def read(ds18b20):
 def start_filtration():
     # make sure the other systems are off first
     if get_state() == 'start_heater':
-        stop_heater()
-        stop_circulation_pump()
+        stop_heating_cycle()
 
     if get_state() == 'start_filtration':
         print("Filtration already on")
@@ -68,7 +114,6 @@ def start_filtration():
     return "Filtration pump turned on"
 
 def stop_filtration():
-    #change_state(None)
     print("Turning filtration pump off")
     # insert code to turn filtration off
     return "Filtration pump turned off"
@@ -116,8 +161,9 @@ def determine_action():
     if current_temp >= 104:
         print("Temperature is good, nothing to do")
         system_reset()
+        change_state('monitor_only')
         print("Waiting " + str(pause_between_checks) + " seconds before we check again")
-        time.sleep(pause_between_checks) # temp is good, we should wait a little while before we check again
+        threaded_timer = delayed_stop(system_reset, pause_between_checks) # temp is good, we should wait a little while before we check again
     elif current_temp < 96:
         delay = TEST_SLEEP_FOR if TEST_MODE else LONG_RUN
         print("Temperature is less than 96, running for " + str(delay) + " seconds")
@@ -144,6 +190,14 @@ def delayed_stop(func, timeout):
     t.start()
 
     return t 
+
+def stop_heating_cycle():
+    global threaded_timer
+
+    if threaded_timer: threaded_timer.cancel() 
+
+    stop_heater()
+    stop_circulation_pump()
 
 def system_reset():
     global threaded_timer
@@ -194,12 +248,9 @@ def get_state():
 
 ### listening server handler
 def handle(clientsocket, address):
-    commands = ['start_filtration', 'stop_filtration', 'start_heater', 'stop_heater', 'system_reset', 'system_off', 'get_temp', 'get_state']
+    commands = ['start_filtration', 'start_heater', 'system_off', 'get_temp', 'get_state']
     command_dict = {'start_filtration' : start_filtration,
-                    'stop_filtration'  : system_reset,
-                    'start_heater'     : determine_action,
-                    'stop_heater'      : system_off,
-                    'system_reset'     : system_reset,
+                    'start_heater'     : system_reset,
                     'system_off'       : system_off,
                     'get_temp'         : get_temp,
                     'get_state'        : get_state,
@@ -240,19 +291,23 @@ if __name__ == '__main__':
         TEST_SLEEP_FOR = 3
         current_test_temp = None
 
+        # max and min temps
+        MAX_TEMP=104.0
+        MIN_TEMP=102.0
+
         # how long do we wait between checks when the temperature is 104+
-        PAUSE_BETWEEN_CHECKS_FOR = 1800
+        PAUSE_BETWEEN_CHECKS_FOR = 5400
 
         # how long to cycle filtration before we check the temperature
-        CYCLE_FILTRATION_FOR = 20
+        CYCLE_FILTRATION_FOR = 5
 
         # debounce time for push buttons
         DEBOUNCE = 0.2
 
         # how long the heater will run under certain conditions, see def determine_action
-        LONG_RUN  = 5400
-        MED_RUN   = 3600
-        SHORT_RUN = 1800
+        LONG_RUN  = 7200
+        MED_RUN   = 5400
+        SHORT_RUN = 3600
 
         # configuration for server listening for commands
         MAX_LENGTH = 4096
@@ -310,55 +365,20 @@ if __name__ == '__main__':
                             determine_action()
                         else:
                             system_reset()
+                    elif get_state() == 'monitor_only' or get_state() == 'start_heater':
+                        # if the temp drops below lower threshhold turn on the heater early, if it gets to upper threshhold early turn the heater off 
+                        temp = get_temp()
+                        if temp < MIN_TEMP:
+                            print(f'Temperature ({temp}) is below desired temperature')
+                            system_reset()
+                        elif temp > MAX_TEMP:
+                            print(f'Temperature ({temp}) is above desired temperature')
+                            if not get_state() == 'monitor_only':
+                                system_reset()
+                                change_state('monitor_only')
+                                threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS) # check again in PAUSE_BETWEEN_CHECKS seconds
                 except:
                     kill()
 
     except KeyboardInterrupt:
         kill()
-
-### code for 4 channel relay
-#
-#GPIO.setmode(GPIO.BCM)
-#
-## init list with pin numbers
-#
-#pinList = [2, 3, 4, 17]
-#
-## loop through pins and set mode and state to 'high'
-#
-#for i in pinList:
-#    GPIO.setup(i, GPIO.OUT)
-#    GPIO.output(i, GPIO.HIGH)
-#
-## time to sleep between operations in the main loop
-#
-#SleepTimeL = 2
-#
-## main loop
-#
-#try:
-#  GPIO.output(2, GPIO.LOW)
-#  print "ONE"
-#  time.sleep(SleepTimeL);
-#  GPIO.output(3, GPIO.LOW)
-#  print "TWO"
-#  time.sleep(SleepTimeL);
-#  GPIO.output(4, GPIO.LOW)
-#  print "THREE"
-#  time.sleep(SleepTimeL);
-#  GPIO.output(17, GPIO.LOW)
-#  print "FOUR"
-#  time.sleep(SleepTimeL);
-#  GPIO.cleanup()
-#  print "Good bye!"
-#
-## End program cleanly with keyboard
-#except KeyboardInterrupt:
-#  print "  Quit"
-#
-#  # Reset GPIO settings
-#  GPIO.cleanup()
-#
-#
-## find more information on this script at
-## http://youtu.be/WpM1aq4B8-A
