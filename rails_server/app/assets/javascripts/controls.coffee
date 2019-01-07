@@ -101,5 +101,3 @@ $ ->
   #TODO Uncomment when ready to go live, this is commented out so for testing purposes
   gon.watch('current_temp', interval: 20000, url: '/controls', refreshGauge)
   gon.watch('current_state', interval: 20000, url: '/controls', updateState)
-
-  

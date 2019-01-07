@@ -56,3 +56,6 @@ end
 gem 'tzinfo-data', platforms: [:mingw, :mswin, :x64_mingw, :jruby]
 
 gem 'gon'
+gem 'dotenv'
+gem 'twilio-ruby', '~> 5.18.0'
+

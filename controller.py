@@ -316,7 +316,7 @@ if __name__ == '__main__':
         TIMEOUT = 2
         LISTEN = 10
 
-        # current state of the system, [None, start_filtration, start_heater, system_off]
+        # current state of the system, [None, start_filtration, start_heater, system_off, monitor_only]
         current_state = None
 
         # threaded timer used in def delayed_stop
@@ -325,6 +325,7 @@ if __name__ == '__main__':
         ### make sure all systems are off when first starting up ###
         print("################### System Startup #####################")
         system_reset()
+        current_state = 'monitor_only' # let's start off by monitoring
 
         print("Starting up listening server")
         serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -356,6 +357,7 @@ if __name__ == '__main__':
                     client_thread = threading.Thread(target=handle, args=(clientsocket,address))
                     client_thread.daemon = True
                     client_thread.start()
+                #TODO this doesn't seem to be working
                 except socket.timeout:
                     if get_state() == None:
                         #Heat Mode (we want 104)
@@ -370,13 +372,16 @@ if __name__ == '__main__':
                         temp = get_temp()
                         if temp < MIN_TEMP:
                             print(f'Temperature ({temp}) is below desired temperature')
-                            system_reset()
+                            if not get_state() == 'start_heater':
+                                system_reset()
                         elif temp > MAX_TEMP:
                             print(f'Temperature ({temp}) is above desired temperature')
                             if not get_state() == 'monitor_only':
                                 system_reset()
                                 change_state('monitor_only')
-                                threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS) # check again in PAUSE_BETWEEN_CHECKS seconds
+                                threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS_FOR) # check again in PAUSE_BETWEEN_CHECKS_FOR seconds
+                        else:
+                            print(f'Temperature ({temp}) is perfect')
                 except:
                     kill()
 

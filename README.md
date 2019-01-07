@@ -27,8 +27,15 @@ The reasoning for the way it runs is that pumps/sensors have been off lately.  I
 
 ## Requirements/Installation
 
+### For Hot Tub Controller (python)
 * python 2.7 or above
 * RPi.GPIO
+* Twilio (only if you want to script twilio_send.py to send SMS, requires .env file)
+
+### For Rails Server
+* Ruby 2.4.2
+* Just bundle install (Gemfile)
+* For Twilio (to use rails runner "Client.sms_status", requires twilio.env file)
 
 git clone https://github.com/amcates/raspberry-hot-tub.git
 
@@ -39,3 +46,8 @@ python controller.rb
 
 Test mode:
 TEST_MODE=true python controller.rb
+
+Rails server:
+Located in rails_server folder
+rails s -b 0.0.0.0 (development mode but available on your entire internal network, use some sort of web server if you want to make it more stable)
+
