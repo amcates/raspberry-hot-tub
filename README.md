@@ -36,6 +36,8 @@ The reasoning for the way it runs is that pumps/sensors have been off lately.  I
 * Ruby 2.4.2
 * Just bundle install (Gemfile)
 * For Twilio (to use rails runner "Client.sms_status", requires twilio.env file)
+* Using Ratchet (goratchet.com) so it's designed to be viewed on mobile devices but will work on normal web browser
+* Using Canvas Gauges (canvas-gauges.com)
 
 git clone https://github.com/amcates/raspberry-hot-tub.git
 
