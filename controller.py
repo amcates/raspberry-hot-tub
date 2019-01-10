@@ -1,11 +1,13 @@
 #!/usr/bin/python
-#import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 import threading
 import socket
 import time
 import datetime
 import os
 import json
+
+from button import *
 
 ### code for 4 channel relay
 #
@@ -240,7 +242,7 @@ def json_value(attr, value):
 
 def change_state(new_state):
     global current_state
-    print(f'State changed from {current_state} to {new_state}')
+    print("State changed from " + str(current_state) + " to " + str(new_state))
     current_state = new_state
 
 def get_state():
@@ -264,11 +266,11 @@ def handle(clientsocket, address):
             command = buf.decode('utf-8')
             if command in commands:
                 resp = command_dict[command]()
-                valid = f'Command Received: {command} Response: {resp}'
+                valid = "Command Received: " + str(command) + " Response: " + str(resp)
                 print(valid)
                 clientsocket.send(str(resp).encode('utf-8'))
             else:
-                invalid = f'Invalid Command: {command}'
+                invalid = "Invalid Command: " + str(command)
                 print(invalid)
                 clientsocket.send(invalid.encode('utf-8'))
                 
@@ -276,6 +278,16 @@ def handle(clientsocket, address):
     finally:
         clientsocket.close()
 
+
+### handle button push
+
+def navigation_button():
+    while True:
+        if FILTRATION_BUTTON.is_pressed():
+            if get_state() == 'start_filtration':
+                system_reset()
+            else:
+                start_filtration()
 
 ### exit application
 def kill():
@@ -303,6 +315,10 @@ if __name__ == '__main__':
 
         # debounce time for push buttons
         DEBOUNCE = 0.2
+
+        # Button used to turn filtration on/off
+        FILTRATION_BUTTON_GPIO = 26
+        FILTRATION_BUTTON = Button(FILTRATION_BUTTON_GPIO, debounce=DEBOUNCE)
 
         # how long the heater will run under certain conditions, see def determine_action
         LONG_RUN  = 7200
@@ -349,7 +365,13 @@ if __name__ == '__main__':
             print("################### End TEST ########################")
         else:
             print("######### Starting to monitor for commands and  temperature ########")
+            
+            navigation_button_thread = threading.Thread(target=navigation_button)
+            navigation_button_thread.daemon = True
+            navigation_button_thread.start()
+
             while 1:
+                        
                 #accept connections from outside
                 try:
                     (clientsocket, address) = serversocket.accept()
@@ -371,17 +393,17 @@ if __name__ == '__main__':
                         # if the temp drops below lower threshhold turn on the heater early, if it gets to upper threshhold early turn the heater off 
                         temp = get_temp()
                         if temp < MIN_TEMP:
-                            print(f'Temperature ({temp}) is below desired temperature')
+                            print("Temperature (" + str(temp) + ") is below desired temperature")
                             if not get_state() == 'start_heater':
                                 system_reset()
                         elif temp > MAX_TEMP:
-                            print(f'Temperature ({temp}) is above desired temperature')
+                            print("Temperature (" + str(temp) + ") is above desired temperature")
                             if not get_state() == 'monitor_only':
                                 system_reset()
                                 change_state('monitor_only')
                                 threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS_FOR) # check again in PAUSE_BETWEEN_CHECKS_FOR seconds
                         else:
-                            print(f'Temperature ({temp}) is perfect')
+                            print("Temperature (" + str(temp) + ") is perfect")
                 except:
                     kill()
 
