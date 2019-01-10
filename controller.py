@@ -6,6 +6,7 @@ import time
 import datetime
 import os
 import json
+import lcddriver
 
 from button import *
 
@@ -289,6 +290,9 @@ def navigation_button():
             else:
                 start_filtration()
 
+def print_to_lcd():
+
+
 ### exit application
 def kill():
     system_reset()
@@ -331,6 +335,9 @@ if __name__ == '__main__':
         HOST = '127.0.0.1'
         TIMEOUT = 2
         LISTEN = 10
+
+        # LCD 16x2 i2c
+        LCD = lcddriver.lcd()
 
         # current state of the system, [None, start_filtration, start_heater, system_off, monitor_only]
         current_state = None
