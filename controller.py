@@ -1,11 +1,14 @@
 #!/usr/bin/python
-#import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 import threading
 import socket
 import time
 import datetime
 import os
 import json
+import lcddriver
+
+from button import *
 
 ### code for 4 channel relay
 #
@@ -240,8 +243,9 @@ def json_value(attr, value):
 
 def change_state(new_state):
     global current_state
-    print(f'State changed from {current_state} to {new_state}')
+    print("State changed from " + str(current_state) + " to " + str(new_state))
     current_state = new_state
+    update_lcd()
 
 def get_state():
     return current_state
@@ -264,11 +268,11 @@ def handle(clientsocket, address):
             command = buf.decode('utf-8')
             if command in commands:
                 resp = command_dict[command]()
-                valid = f'Command Received: {command} Response: {resp}'
+                valid = "Command Received: " + str(command) + " Response: " + str(resp)
                 print(valid)
                 clientsocket.send(str(resp).encode('utf-8'))
             else:
-                invalid = f'Invalid Command: {command}'
+                invalid = "Invalid Command: " + str(command)
                 print(invalid)
                 clientsocket.send(invalid.encode('utf-8'))
                 
@@ -277,9 +281,52 @@ def handle(clientsocket, address):
         clientsocket.close()
 
 
+### handle button push
+
+def navigation_button():
+    while 1:
+        if FILTRATION_BUTTON.is_pressed():
+            if get_state() == 'start_filtration':
+                system_reset()
+            else:
+                start_filtration()
+
+def update_lcd():
+    global last_lcd_temp, last_lcd_state
+
+    temp_readout = str(get_temp()) + chr(223) + "F"
+    state = str(get_state())
+    state_readout = 'Unknown'
+
+    if state in ['None', 'monitor_only']:
+        state_readout = 'Monitoring Temp'
+    elif state == 'start_filtration':
+        state_readout = 'Jets On'
+    elif state == 'start_heater':
+        state_readout = 'Heater On'
+    elif state == 'system_off':
+        state_readout = 'System Off'
+
+    if last_lcd_temp != temp_readout or last_lcd_state != state_readout:
+        last_lcd_temp = temp_readout
+        last_lcd_state = state_readout
+
+        LCD.lcd_clear()
+        LCD.lcd_display_string(temp_readout, 1)
+        LCD.lcd_display_string(state_readout, 2)
+
+def monitor_temp_for_lcd():
+    global last_lcd_temp
+
+    while 1:
+        temp_readout = str(get_temp()) + chr(223) + "F"
+        if last_lcd_temp != temp_readout:
+            update_lcd()
+
 ### exit application
 def kill():
     system_reset()
+    change_state('system_off')
     quit()
 
 if __name__ == '__main__':
@@ -304,6 +351,10 @@ if __name__ == '__main__':
         # debounce time for push buttons
         DEBOUNCE = 0.2
 
+        # Button used to turn filtration on/off
+        FILTRATION_BUTTON_GPIO = 26
+        FILTRATION_BUTTON = Button(FILTRATION_BUTTON_GPIO, debounce=DEBOUNCE)
+
         # how long the heater will run under certain conditions, see def determine_action
         LONG_RUN  = 7200
         MED_RUN   = 5400
@@ -316,6 +367,11 @@ if __name__ == '__main__':
         TIMEOUT = 2
         LISTEN = 10
 
+        # LCD 16x2 i2c
+        LCD = lcddriver.lcd()
+        last_lcd_state = ''
+        last_lcd_temp = None
+
         # current state of the system, [None, start_filtration, start_heater, system_off, monitor_only]
         current_state = None
 
@@ -325,7 +381,6 @@ if __name__ == '__main__':
         ### make sure all systems are off when first starting up ###
         print("################### System Startup #####################")
         system_reset()
-        current_state = 'monitor_only' # let's start off by monitoring
 
         print("Starting up listening server")
         serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -349,7 +404,17 @@ if __name__ == '__main__':
             print("################### End TEST ########################")
         else:
             print("######### Starting to monitor for commands and  temperature ########")
+            
+            navigation_button_thread = threading.Thread(target=navigation_button)
+            navigation_button_thread.daemon = True
+            navigation_button_thread.start()
+            
+            lcd_temp_thread = threading.Thread(target=monitor_temp_for_lcd)
+            lcd_temp_thread.daemon = True
+            lcd_temp_thread.start()
+
             while 1:
+                        
                 #accept connections from outside
                 try:
                     (clientsocket, address) = serversocket.accept()
@@ -371,17 +436,22 @@ if __name__ == '__main__':
                         # if the temp drops below lower threshhold turn on the heater early, if it gets to upper threshhold early turn the heater off 
                         temp = get_temp()
                         if temp < MIN_TEMP:
-                            print(f'Temperature ({temp}) is below desired temperature')
+                            print("Temperature (" + str(temp) + ") is below desired temperature")
                             if not get_state() == 'start_heater':
                                 system_reset()
                         elif temp > MAX_TEMP:
-                            print(f'Temperature ({temp}) is above desired temperature')
+                            print("Temperature (" + str(temp) + ") is above desired temperature")
                             if not get_state() == 'monitor_only':
                                 system_reset()
                                 change_state('monitor_only')
                                 threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS_FOR) # check again in PAUSE_BETWEEN_CHECKS_FOR seconds
                         else:
-                            print(f'Temperature ({temp}) is perfect')
+                            if get_state() == 'start_heater':
+                                system_reset()
+                                change_state('monitor_only')
+                                threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS_FOR) # check again in PAUSE_BETWEEN_CHECKS_FOR seconds
+
+                            print("Temperature (" + str(temp) + ") is perfect")
                 except:
                     kill()
 
