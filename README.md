@@ -30,6 +30,7 @@ The reasoning for the way it runs is that pumps/sensors have been off lately.  I
 ### For Hot Tub Controller (python)
 * python 2.7 or above
 * RPi.GPIO
+* RPLCD
 * Twilio (only if you want to script twilio_send.py to send SMS, requires .env file)
 
 ### For Rails Server

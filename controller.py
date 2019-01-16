@@ -6,7 +6,7 @@ import time
 import datetime
 import os
 import json
-import lcddriver
+from RPLCD.i2c import CharLCD
 
 from button import *
 
@@ -34,7 +34,7 @@ def start_filtration():
     if get_state() == 'start_filtration':
         print("Filtration already on")
     else:
-        GPIO.output(RELAY_1, GPIO.HIGH)
+        relay_on(RELAY_1)
         change_state('start_filtration')
 
         print("Turning filtration pump on")
@@ -43,7 +43,7 @@ def start_filtration():
     return "Filtration pump turned on"
 
 def stop_filtration():
-    GPIO.output(RELAY_1, GPIO.LOW)
+    relay_off(RELAY_1)
     print("Turning filtration pump off")
     # insert code to turn filtration off
     return "Filtration pump turned off"
@@ -54,22 +54,26 @@ def cycle_filtration(duration):
     stop_filtration()
 
 def start_circulation_pump():
+    relay_on(RELAY_2)
     print("Turning circulation pump on")
     # insert code to turn circulation on
     return "Circulation pump turned on"
 
 def stop_circulation_pump():
+    relay_off(RELAY_2)
     print("Turning circulation pump off")
     # insert code to turn circulation off
     return "Circulation pump turned off"
 
 def start_heater():
+    relay_on(RELAY_3)
     change_state('start_heater')
     print("Turning on heater")
     # replace this with code to turn heater on
     return "Heater turned on"
 
 def stop_heater():
+    relay_off(RELAY_3)
     print("Turning off heater")
     # replace this with code to turn heater off
     return "Heater turned off"
@@ -212,6 +216,9 @@ def handle(clientsocket, address):
 
 def navigation_button():
     while 1:
+        if exit_now:
+            break
+
         if FILTRATION_BUTTON.is_pressed():
             if get_state() == 'start_filtration':
                 system_reset()
@@ -238,9 +245,7 @@ def update_lcd():
         last_lcd_temp = temp_readout
         last_lcd_state = state_readout
 
-        LCD.lcd_clear()
-        LCD.lcd_display_string(temp_readout, 1)
-        LCD.lcd_display_string(state_readout, 2)
+        lcd_write(temp_readout, state_readout)
 
 def monitor_temp_for_lcd():
     global last_lcd_temp
@@ -250,10 +255,29 @@ def monitor_temp_for_lcd():
         if last_lcd_temp != temp_readout:
             update_lcd()
 
+def relay_on(pin):
+    GPIO.output(pin, GPIO.HIGH)
+    time.sleep(0.2)
+
+def relay_off(pin):
+    GPIO.output(pin, GPIO.LOW)
+    time.sleep(0.2)
+
+def lcd_write(line_1, line_2):
+        LCD.clear()
+        LCD.cursor_pos = (0,0)
+        LCD.write_string(line_1)
+        LCD.cursor_pos = (1,0)
+        LCD.write_string(line_2)
+
 ### exit application
 def kill():
+    global exit_now
+    exit_now = True
+
     system_reset()
     change_state('system_off')
+    lcd_write("Good Bye!", "System Off")
     GPIO.cleanup()
     quit()
 
@@ -296,7 +320,7 @@ if __name__ == '__main__':
         LISTEN = 10
 
         # LCD 16x2 i2c
-        LCD = lcddriver.lcd()
+        LCD = CharLCD('PCF8574', 0x27)
         last_lcd_state = ''
         last_lcd_temp = None
 
@@ -306,16 +330,19 @@ if __name__ == '__main__':
         # relay 2 = 24, circulation pump
         # relay 3 = 25, heater
         # relay 4 = 12, currently not used, maybe for a dehumidifier
-        RELAY_1 = 23
-        RELAY_2 = 24
-        RELAY_3 = 25
-        RELAY_4 = 12
+        RELAY_1 = 23 # currently allocated to filtration pump
+        RELAY_2 = 24 # currently allocated to circulation pump
+        RELAY_3 = 25 # currently allocated to heater
+        RELAY_4 = 12 # not currently used, issue with Raspberry PI and voltage
         
         pinList = [RELAY_1, RELAY_2, RELAY_3] # RELAY_4 left out on purpose
         
         for i in pinList:
             GPIO.setup(i, GPIO.OUT)
             GPIO.output(i, GPIO.HIGH)
+
+        # exit flag, used to make threads exit cleanly
+        exit_now = False
 
         # current state of the system, [None, start_filtration, start_heater, system_off, monitor_only]
         current_state = None
