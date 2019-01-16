@@ -23,7 +23,7 @@ def read(ds18b20):
     temperature = float(temperaturedata[2:])
     celsius = temperature / 1000
     farenheit = (celsius * 1.8) + 32
-    return farenheit
+    return round(farenheit, 2)
 
 ### code for running the pumps and heater
 
@@ -192,7 +192,6 @@ def handle(clientsocket, address):
                     'get_state'        : get_state,
                 }
     try:
-        log('Connection: ', address)
         while 1:
             buf = clientsocket.recv(MAX_LENGTH)
             if buf == '': return #client terminated connection
@@ -200,12 +199,14 @@ def handle(clientsocket, address):
             command = buf.decode('utf-8')
             if command in commands:
                 resp = command_dict[command]()
-                valid = "Command Received: " + str(command) + " Response: " + str(resp)
-                log(valid)
+                valid = "Connection: " + str(address[0]) + " Command Received: " + str(command) + " Response: " + str(resp)
+                if str(address[0]) != '127.0.0.1':
+                    log(valid)
                 clientsocket.send(str(resp).encode('utf-8'))
             else:
-                invalid = "Invalid Command: " + str(command)
-                log(invalid)
+                invalid = "Connection: " + str(address[0]) + " Invalid Command: " + str(command)
+                if str(address[0]) != '127.0.0.1':
+                    log(invalid)
                 clientsocket.send(invalid.encode('utf-8'))
                 
             break
