@@ -6,6 +6,7 @@ import time
 import datetime
 import os
 import json
+import logging
 from RPLCD.i2c import CharLCD
 
 from button import *
@@ -32,19 +33,19 @@ def start_filtration():
         stop_heating_cycle()
 
     if get_state() == 'start_filtration':
-        print("Filtration already on")
+        log("Filtration already on")
     else:
         relay_on(RELAY_1)
         change_state('start_filtration')
 
-        print("Turning filtration pump on")
+        log("Turning filtration pump on")
         # insert code to turn filtration on
 
     return "Filtration pump turned on"
 
 def stop_filtration():
     relay_off(RELAY_1)
-    print("Turning filtration pump off")
+    log("Turning filtration pump off")
     # insert code to turn filtration off
     return "Filtration pump turned off"
 
@@ -55,26 +56,26 @@ def cycle_filtration(duration):
 
 def start_circulation_pump():
     relay_on(RELAY_2)
-    print("Turning circulation pump on")
+    log("Turning circulation pump on")
     # insert code to turn circulation on
     return "Circulation pump turned on"
 
 def stop_circulation_pump():
     relay_off(RELAY_2)
-    print("Turning circulation pump off")
+    log("Turning circulation pump off")
     # insert code to turn circulation off
     return "Circulation pump turned off"
 
 def start_heater():
     relay_on(RELAY_3)
     change_state('start_heater')
-    print("Turning on heater")
+    log("Turning on heater")
     # replace this with code to turn heater on
     return "Heater turned on"
 
 def stop_heater():
     relay_off(RELAY_3)
-    print("Turning off heater")
+    log("Turning off heater")
     # replace this with code to turn heater off
     return "Heater turned off"
 
@@ -88,25 +89,25 @@ def determine_action():
     if get_state() == 'start_filtration':
         stop_filtration()
 
-    print("Current temp is " + str(current_temp))
+    log("Current temp is " + str(current_temp))
     change_state('start_heater') #TODO Does this need to be here, in order for the below code to work it does
     pause_between_checks = TEST_SLEEP_FOR if TEST_MODE else PAUSE_BETWEEN_CHECKS_FOR
 
     if current_temp >= 104:
-        print("Temperature is good, nothing to do")
+        log("Temperature is good, nothing to do")
         system_reset()
         change_state('monitor_only')
-        print("Waiting " + str(pause_between_checks) + " seconds before we check again")
+        log("Waiting " + str(pause_between_checks) + " seconds before we check again")
         threaded_timer = delayed_stop(system_reset, pause_between_checks) # temp is good, we should wait a little while before we check again
     elif current_temp < 96:
         delay = TEST_SLEEP_FOR if TEST_MODE else LONG_RUN
-        print("Temperature is less than 96, running for " + str(delay) + " seconds")
+        log("Temperature is less than 96, running for " + str(delay) + " seconds")
     elif 96 <= current_temp <= 99:
         delay = TEST_SLEEP_FOR if TEST_MODE else MED_RUN
-        print("Temperature is between 98 and 100, running for " + str(delay) + " seconds")
+        log("Temperature is between 98 and 100, running for " + str(delay) + " seconds")
     elif 100 <= current_temp <= 103:
         delay = TEST_SLEEP_FOR if TEST_MODE else SHORT_RUN
-        print("Temperature is between 100 and 103, running for " + str(delay) + " seconds")
+        log("Temperature is between 100 and 103, running for " + str(delay) + " seconds")
 
     if get_state() == 'start_heater':
         start_circulation_pump()
@@ -148,13 +149,13 @@ def system_reset():
 
 def reset_state():
     change_state(None)
-    print("Resetting current_state to None")
+    log("Resetting current_state to None")
     return "System state set to None"
 
 def system_off():
     system_reset()
     change_state('system_off')
-    print("Turning the system off")
+    log("Turning the system off")
     return "System turned off"
 
 def get_temp():
@@ -174,7 +175,7 @@ def json_value(attr, value):
 
 def change_state(new_state):
     global current_state
-    print("State changed from " + str(current_state) + " to " + str(new_state))
+    log("State changed from " + str(current_state) + " to " + str(new_state))
     current_state = new_state
     update_lcd()
 
@@ -191,7 +192,7 @@ def handle(clientsocket, address):
                     'get_state'        : get_state,
                 }
     try:
-        print('Connection: ', address)
+        log('Connection: ', address)
         while 1:
             buf = clientsocket.recv(MAX_LENGTH)
             if buf == '': return #client terminated connection
@@ -200,11 +201,11 @@ def handle(clientsocket, address):
             if command in commands:
                 resp = command_dict[command]()
                 valid = "Command Received: " + str(command) + " Response: " + str(resp)
-                print(valid)
+                log(valid)
                 clientsocket.send(str(resp).encode('utf-8'))
             else:
                 invalid = "Invalid Command: " + str(command)
-                print(invalid)
+                log(invalid)
                 clientsocket.send(invalid.encode('utf-8'))
                 
             break
@@ -270,6 +271,14 @@ def lcd_write(line_1, line_2):
         LCD.cursor_pos = (1,0)
         LCD.write_string(line_2)
 
+def log(message):
+    global last_logged
+
+    # only log if the message has changed, this should save some disk space and keep the log from growing too fast
+    if not message == str(last_logged):
+        logging.info(message)
+        last_logged = message
+
 ### exit application
 def kill():
     global exit_now
@@ -278,6 +287,7 @@ def kill():
     system_reset()
     change_state('system_off')
     lcd_write("Good Bye!", "System Off")
+    logging.error("System Shutdown")
     GPIO.cleanup()
     quit()
 
@@ -285,6 +295,9 @@ if __name__ == '__main__':
     try:
         ## NOTE ALL TIMES ARE IN SECONDS
 
+        logging.basicConfig(filename='logs/controller.log', format='%(asctime)s: %(levelname)s: %(message)s', level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+        last_logged = None
+        
         # usage: TEST_MODE=true python controller.py
         TEST_MODE = True if os.environ.get('TEST_MODE', 'false') == 'true' else False
         TEST_SLEEP_FOR = 3
@@ -351,31 +364,28 @@ if __name__ == '__main__':
         threaded_timer = None
 
         ### make sure all systems are off when first starting up ###
-        print("################### System Startup #####################")
+        log("################### System Startup #####################")
         system_reset()
 
-        print("Starting up listening server")
+        log("Starting up listening server")
         serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         serversocket.bind((HOST, PORT))
         serversocket.settimeout(TIMEOUT)
         serversocket.listen(LISTEN)
 
-        print("\n")
-        
         if TEST_MODE == True:
-            print("############### Starting TEST procedure ###############")
+            log("############### Starting TEST procedure ###############")
 
             for current_temp in [104, 102, 97, 95]:
-                print("Starting procedure for " + str(current_temp))
-                print("--------------------------")
+                log("Starting procedure for " + str(current_temp))
+                log("--------------------------")
                 cycle_filtration(TEST_SLEEP_FOR)
                 current_test_temp = current_temp
                 determine_action()
-                print("\n")
 
-            print("################### End TEST ########################")
+            log("################### End TEST ########################")
         else:
-            print("######### Starting to monitor for commands and  temperature ########")
+            log("######### Starting to monitor for commands and  temperature ########")
             
             navigation_button_thread = threading.Thread(target=navigation_button)
             navigation_button_thread.daemon = True
@@ -408,11 +418,11 @@ if __name__ == '__main__':
                         # if the temp drops below lower threshhold turn on the heater early, if it gets to upper threshhold early turn the heater off 
                         temp = get_temp()
                         if temp < MIN_TEMP:
-                            print("Temperature (" + str(temp) + ") is below desired temperature")
+                            log("Temperature (" + str(temp) + ") is below desired temperature")
                             if not get_state() == 'start_heater':
                                 system_reset()
                         elif temp > MAX_TEMP:
-                            print("Temperature (" + str(temp) + ") is above desired temperature")
+                            log("Temperature (" + str(temp) + ") is above desired temperature")
                             if not get_state() == 'monitor_only':
                                 system_reset()
                                 change_state('monitor_only')
@@ -423,7 +433,7 @@ if __name__ == '__main__':
                                 change_state('monitor_only')
                                 threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS_FOR) # check again in PAUSE_BETWEEN_CHECKS_FOR seconds
 
-                            print("Temperature (" + str(temp) + ") is perfect")
+                            log("Temperature (" + str(temp) + ") is perfect")
                 except:
                     kill()
 
