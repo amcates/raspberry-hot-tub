@@ -177,7 +177,6 @@ def change_state(new_state):
     global current_state
     log("State changed from " + str(current_state) + " to " + str(new_state))
     current_state = new_state
-    update_lcd()
 
 def get_state():
     return current_state
@@ -230,37 +229,31 @@ def navigation_button():
 def update_lcd():
     global last_lcd_temp, last_lcd_state
 
-    temp_readout = str(get_temp()) + chr(223) + "F"
-    state = str(get_state())
-    state_readout = 'Unknown'
-
-    if state in ['None', 'monitor_only']:
-        state_readout = 'Monitoring Temp'
-    elif state == 'start_filtration':
-        state_readout = 'Jets On'
-    elif state == 'start_heater':
-        state_readout = 'Heater On'
-    elif state == 'system_off':
-        state_readout = 'System Off'
-
-    if last_lcd_temp != temp_readout or last_lcd_state != state_readout:
-        last_lcd_temp = temp_readout
-        last_lcd_state = state_readout
-
-        lcd_write(temp_readout, state_readout)
-
-def monitor_temp_for_lcd():
-    global last_lcd_temp
-
     start_time = time.process_time()
     display_version = True
+
     while 1:
         temp_readout = str(get_temp()) + chr(223) + "F"
+        state = str(get_state())
+        state_readout = 'Unknown'
         current_time = time.process_time()
         elapsed_time = current_time - start_time
-        if last_lcd_temp != temp_readout:
-            update_lcd()
+
+        if state in ['None', 'monitor_only']:
+            state_readout = 'Monitoring Temp'
+        elif state == 'start_filtration':
+            state_readout = 'Jets On'
+        elif state == 'start_heater':
+            state_readout = 'Heater On'
+        elif state == 'system_off':
+            state_readout = 'System Off'
+
+        if last_lcd_temp != temp_readout or last_lcd_state != state_readout:
+            last_lcd_temp = temp_readout
+            last_lcd_state = state_readout
             start_time = time.process_time()
+
+            lcd_write(temp_readout, state_readout)
         elif elapsed_time > 30 and display_version == True:
             lcd_write(SYS_VERSION, "   " + datetime.date.today().strftime('%m/%d/%Y'))
             display_version = False
@@ -268,7 +261,6 @@ def monitor_temp_for_lcd():
             start_time = time.process_time()
             display_version = True
             last_lcd_temp = None
-            update_lcd()
 
 def relay_on(pin):
     GPIO.output(pin, GPIO.HIGH)
@@ -407,9 +399,9 @@ if __name__ == '__main__':
             navigation_button_thread.daemon = True
             navigation_button_thread.start()
             
-            lcd_temp_thread = threading.Thread(target=monitor_temp_for_lcd)
-            lcd_temp_thread.daemon = True
-            lcd_temp_thread.start()
+            lcd_thread = threading.Thread(target=update_lcd)
+            lcd_thread.daemon = True
+            lcd_thread.start()
 
             while 1:
                         
