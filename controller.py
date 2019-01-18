@@ -15,14 +15,18 @@ from button import *
 
 def read(ds18b20):
     location = ds18b20 # '/sys/bus/w1/devices/' + ds18b20 + '/w1_slave'
-    tfile = open(location)
-    text = tfile.read()
-    tfile.close()
-    secondline = text.split("\n")[1]
-    temperaturedata = secondline.split(" ")[9]
-    temperature = float(temperaturedata[2:])
-    celsius = temperature / 1000
-    farenheit = (celsius * 1.8) + 32
+    try: 
+        tfile = open(location)
+        text = tfile.read()
+        tfile.close()
+        secondline = text.split("\n")[1]
+        temperaturedata = secondline.split(" ")[9]
+        temperature = float(temperaturedata[2:])
+        celsius = temperature / 1000
+        farenheit = (celsius * 1.8) + 32
+    except FileNotFoundError:
+        farenheit = 500.0
+
     return round(farenheit, 2)
 
 ### code for running the pumps and heater
@@ -237,6 +241,11 @@ def update_lcd():
             break
 
         temp_readout = str(get_temp()) + chr(223) + "F"
+
+        # this case handles if the sensor isn't providing data or the sensor file doesn't exist, it basically makes the system thinks it's too hot (prevent heating)
+        if temp_readout == '500.0' + chr(223) + 'F': 
+            temp_readout = 'Sensor Failed'
+
         state = str(get_state())
         state_readout = 'Unknown'
         current_time = time.process_time()
