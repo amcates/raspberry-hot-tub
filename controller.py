@@ -233,6 +233,9 @@ def update_lcd():
     display_version = True
 
     while 1:
+        if exit_now:
+            break
+
         temp_readout = str(get_temp()) + chr(223) + "F"
         state = str(get_state())
         state_readout = 'Unknown'
