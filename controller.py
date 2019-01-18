@@ -252,9 +252,22 @@ def update_lcd():
 def monitor_temp_for_lcd():
     global last_lcd_temp
 
+    start_time = time.process_time()
+    display_version = True
     while 1:
         temp_readout = str(get_temp()) + chr(223) + "F"
+        current_time = time.process_time()
+        elapsed_time = current_time - start_time
         if last_lcd_temp != temp_readout:
+            update_lcd()
+            start_time = time.process_time()
+        elif elapsed_time > 30 and display_version == True:
+            lcd_write(SYS_VERSION, "   " + datetime.date.today().strftime('%m/%d/%Y'))
+            display_version = False
+        elif elapsed_time > 40:
+            start_time = time.process_time()
+            display_version = True
+            last_lcd_temp = None
             update_lcd()
 
 def relay_on(pin):
@@ -299,6 +312,8 @@ if __name__ == '__main__':
         logging.basicConfig(filename='logs/controller.log', format='%(asctime)s: %(levelname)s: %(message)s', level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
         last_logged = None
         
+        SYS_VERSION = "Hot Springs v1.0"
+
         # usage: TEST_MODE=true python controller.py
         TEST_MODE = True if os.environ.get('TEST_MODE', 'false') == 'true' else False
         TEST_SLEEP_FOR = 3
