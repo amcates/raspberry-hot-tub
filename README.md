@@ -45,10 +45,7 @@ git clone https://github.com/amcates/raspberry-hot-tub.git
 ## Usage
 
 Normal operation:
-python controller.rb
-
-Test mode:
-TEST_MODE=true python controller.rb
+python3 controller.rb
 
 Rails server:
 Located in rails_server folder

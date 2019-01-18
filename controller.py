@@ -15,6 +15,7 @@ from button import *
 
 def read(ds18b20):
     location = ds18b20 # '/sys/bus/w1/devices/' + ds18b20 + '/w1_slave'
+
     try: 
         tfile = open(location)
         text = tfile.read()
@@ -95,32 +96,27 @@ def determine_action():
 
     log("Current temp is " + str(current_temp))
     change_state('start_heater') #TODO Does this need to be here, in order for the below code to work it does
-    pause_between_checks = TEST_SLEEP_FOR if TEST_MODE else PAUSE_BETWEEN_CHECKS_FOR
 
     if current_temp >= 104:
         log("Temperature is good, nothing to do")
         system_reset()
         change_state('monitor_only')
-        log("Waiting " + str(pause_between_checks) + " seconds before we check again")
-        threaded_timer = delayed_stop(system_reset, pause_between_checks) # temp is good, we should wait a little while before we check again
+        log("Waiting " + str(PAUSE_BETWEEN_CHECKS_FOR) + " seconds before we check again")
+        threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS_FOR) # temp is good, we should wait a little while before we check again
     elif current_temp < 96:
-        delay = TEST_SLEEP_FOR if TEST_MODE else LONG_RUN
+        delay = LONG_RUN
         log("Temperature is less than 96, running for " + str(delay) + " seconds")
     elif 96 <= current_temp <= 99:
-        delay = TEST_SLEEP_FOR if TEST_MODE else MED_RUN
+        delay = MED_RUN
         log("Temperature is between 98 and 100, running for " + str(delay) + " seconds")
     elif 100 <= current_temp <= 103:
-        delay = TEST_SLEEP_FOR if TEST_MODE else SHORT_RUN
+        delay = SHORT_RUN
         log("Temperature is between 100 and 103, running for " + str(delay) + " seconds")
 
     if get_state() == 'start_heater':
         start_circulation_pump()
         start_heater()
-        if TEST_MODE: 
-            time.sleep(delay)
-            system_reset()
-        else:
-            threaded_timer = delayed_stop(system_reset, delay)
+        threaded_timer = delayed_stop(system_reset, delay)
 
 def delayed_stop(func, timeout):
     def func_wrapper(): func()
@@ -165,12 +161,9 @@ def system_off():
 def get_temp():
     current_temp = None
 
-    if TEST_MODE:
-        current_temp = current_test_temp
-    else:
-        current_temp = None
-        if read("temperature.txt") != None:
-            current_temp = read("temperature.txt")
+    if read("temperature.txt") != None:
+        current_temp = read("temperature.txt")
+
     return current_temp
 
 def json_value(attr, value):
@@ -318,11 +311,6 @@ if __name__ == '__main__':
         
         SYS_VERSION = "Hot Springs v1.0"
 
-        # usage: TEST_MODE=true python controller.py
-        TEST_MODE = True if os.environ.get('TEST_MODE', 'false') == 'true' else False
-        TEST_SLEEP_FOR = 3
-        current_test_temp = None
-
         # max and min temps
         MAX_TEMP=104.0
         MIN_TEMP=102.0
@@ -372,7 +360,6 @@ if __name__ == '__main__':
         
         for i in pinList:
             GPIO.setup(i, GPIO.OUT)
-            GPIO.output(i, GPIO.HIGH)
 
         # exit flag, used to make threads exit cleanly
         exit_now = False
@@ -393,69 +380,58 @@ if __name__ == '__main__':
         serversocket.settimeout(TIMEOUT)
         serversocket.listen(LISTEN)
 
-        if TEST_MODE == True:
-            log("############### Starting TEST procedure ###############")
+        log("######### Starting to monitor for commands and  temperature ########")
+        
+        navigation_button_thread = threading.Thread(target=navigation_button)
+        navigation_button_thread.daemon = True
+        navigation_button_thread.start()
+        
+        lcd_thread = threading.Thread(target=update_lcd)
+        lcd_thread.daemon = True
+        lcd_thread.start()
 
-            for current_temp in [104, 102, 97, 95]:
-                log("Starting procedure for " + str(current_temp))
-                log("--------------------------")
-                cycle_filtration(TEST_SLEEP_FOR)
-                current_test_temp = current_temp
-                determine_action()
+        while 1:
+                    
+            #accept connections from outside
+            try:
+                (clientsocket, address) = serversocket.accept()
 
-            log("################### End TEST ########################")
-        else:
-            log("######### Starting to monitor for commands and  temperature ########")
-            
-            navigation_button_thread = threading.Thread(target=navigation_button)
-            navigation_button_thread.daemon = True
-            navigation_button_thread.start()
-            
-            lcd_thread = threading.Thread(target=update_lcd)
-            lcd_thread.daemon = True
-            lcd_thread.start()
-
-            while 1:
-                        
-                #accept connections from outside
-                try:
-                    (clientsocket, address) = serversocket.accept()
-
-                    client_thread = threading.Thread(target=handle, args=(clientsocket,address))
-                    client_thread.daemon = True
-                    client_thread.start()
-                #TODO this doesn't seem to be working
-                except socket.timeout:
-                    if get_state() == None:
-                        #Heat Mode (we want 104)
-                        cycle_filtration(CYCLE_FILTRATION_FOR)
-     
-                        if get_temp():
-                            determine_action()
-                        else:
+                client_thread = threading.Thread(target=handle, args=(clientsocket,address))
+                client_thread.daemon = True
+                client_thread.start()
+            #TODO this doesn't seem to be working
+            except socket.timeout:
+                if get_state() == None:
+                    #Heat Mode (we want 104)
+                    cycle_filtration(CYCLE_FILTRATION_FOR)
+ 
+                    if get_temp():
+                        determine_action()
+                    else:
+                        system_reset()
+                elif get_state() == 'monitor_only' or get_state() == 'start_heater':
+                    # if the temp drops below lower threshhold turn on the heater early, if it gets to upper threshhold early turn the heater off 
+                    temp = get_temp()
+                    if temp < MIN_TEMP:
+                        log("Temperature (" + str(temp) + ") is below desired temperature")
+                        if get_state() != 'start_heater':
                             system_reset()
-                    elif get_state() == 'monitor_only' or get_state() == 'start_heater':
-                        # if the temp drops below lower threshhold turn on the heater early, if it gets to upper threshhold early turn the heater off 
-                        temp = get_temp()
-                        if temp < MIN_TEMP:
-                            log("Temperature (" + str(temp) + ") is below desired temperature")
-                            if not get_state() == 'start_heater':
-                                system_reset()
-                        elif temp > MAX_TEMP:
-                            log("Temperature (" + str(temp) + ") is above desired temperature")
-                            if not get_state() == 'monitor_only':
-                                system_reset()
-                                change_state('monitor_only')
-                                threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS_FOR) # check again in PAUSE_BETWEEN_CHECKS_FOR seconds
-                        else:
+                    elif temp > MAX_TEMP:
+                        log("Temperature (" + str(temp) + ") is above desired temperature")
+                        if get_state() != 'monitor_only':
+                            system_reset()
+                            change_state('monitor_only')
+                            threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS_FOR) # check again in PAUSE_BETWEEN_CHECKS_FOR seconds
+                    else:
+                        if temp == MAX_TEMP:
                             if get_state() == 'start_heater':
                                 system_reset()
                                 change_state('monitor_only')
                                 threaded_timer = delayed_stop(system_reset, PAUSE_BETWEEN_CHECKS_FOR) # check again in PAUSE_BETWEEN_CHECKS_FOR seconds
 
-                            log("Temperature (" + str(temp) + ") is perfect")
-                except:
-                    kill()
+                                log("Temperature (" + str(temp) + ") is perfect")
+            except:
+                kill()
 
     except KeyboardInterrupt:
         kill()
