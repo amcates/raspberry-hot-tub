@@ -10,6 +10,8 @@ $ ->
     maxValue: '140'
     majorTicks: [0,10,20,30,40,50,60,70,80,90,100,110,120,130,140]
     value: gon.current_temp
+    animationDuration: 1500
+    animationRule: "linear"
     units: '°F'
     height: '360'
     highlights: [

@@ -14,7 +14,7 @@ from button import *
 ### code for reading from temperature sensor (#TODO we will use 2 sensors so this will need to be modified)
 
 def read(ds18b20):
-    location = ds18b20 # '/sys/bus/w1/devices/' + ds18b20 + '/w1_slave'
+    location = '/sys/bus/w1/devices/' + ds18b20 + '/w1_slave'
 
     try: 
         tfile = open(location)
@@ -161,8 +161,8 @@ def system_off():
 def get_temp():
     current_temp = None
 
-    if read("temperature.txt") != None:
-        current_temp = read("temperature.txt")
+    if read("28-021892458db6") != None:
+        current_temp = read("28-021892458db6")
 
     return current_temp
 
@@ -276,11 +276,10 @@ def relay_off(pin):
     time.sleep(0.2)
 
 def lcd_write(line_1, line_2):
-        LCD.clear()
         LCD.cursor_pos = (0,0)
-        LCD.write_string(line_1)
+        LCD.write_string(line_1.ljust(16))
         LCD.cursor_pos = (1,0)
-        LCD.write_string(line_2)
+        LCD.write_string(line_2.ljust(16))
 
 def log(message):
     global last_logged
@@ -322,7 +321,7 @@ if __name__ == '__main__':
         CYCLE_FILTRATION_FOR = 5
 
         # debounce time for push buttons
-        DEBOUNCE = 0.2
+        DEBOUNCE = 0.5
 
         # Button used to turn filtration on/off
         FILTRATION_BUTTON_GPIO = 26
