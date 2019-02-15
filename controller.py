@@ -305,7 +305,7 @@ if __name__ == '__main__':
     try:
         ## NOTE ALL TIMES ARE IN SECONDS
 
-        logging.basicConfig(filename='logs/controller.log', format='%(asctime)s: %(levelname)s: %(message)s', level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
+        logging.basicConfig(filename='./logs/controller.log', format='%(asctime)s: %(levelname)s: %(message)s', level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
         last_logged = None
         
         SYS_VERSION = "Hot Springs v1.0"
@@ -390,7 +390,12 @@ if __name__ == '__main__':
         lcd_thread.start()
 
         while 1:
-                    
+           
+            # make it easy to stop the application via file
+            if os.path.isfile('./shutdown.txt'):
+                os.remove('./shutdown.txt')
+                kill()
+
             #accept connections from outside
             try:
                 (clientsocket, address) = serversocket.accept()
