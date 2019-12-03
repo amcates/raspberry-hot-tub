@@ -61,24 +61,11 @@ if __name__ == '__main__':
 
         # LCD 16x2 i2c
         LCD = CharLCD('PCF8574', 0x27)
-        last_lcd_state = ''
-        last_lcd_temp = None
 
-        # 4 channel relay
+        # 4 channel relay, only using one relay to control the heater
         GPIO.setmode(GPIO.BCM)
-        # relay 1 = 23, filtration pump
-        # relay 2 = 24, circulation pump
-        # relay 3 = 25, heater
-        # relay 4 = 12, currently not used, maybe for a dehumidifier
-        RELAY_1 = 23 # currently allocated to filtration pump
-        RELAY_2 = 24 # currently allocated to circulation pump
         RELAY_3 = 25 # currently allocated to heater
-        RELAY_4 = 12 # not currently used, issue with Raspberry PI and voltage
-
-        pinList = [RELAY_3] # RELAY_4 left out on purpose
-
-        for i in pinList:
-            GPIO.setup(i, GPIO.OUT)
+        GPIO.setup(RELAY_3, GPIO.OUT)
 
         # get current temperature and turn on/off heater as necessary
         current_temp = get_temp()
@@ -103,4 +90,5 @@ if __name__ == '__main__':
         lcd_write(temp_readout, state_readout)
 
     except KeyboardInterrupt:
-        kill()
+        GPIO.cleanup()
+        quit()
