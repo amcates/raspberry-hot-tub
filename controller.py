@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import RPi.GPIO as GPIO
 import logging
+import time
 from RPLCD.i2c import CharLCD
 
 def read(ds18b20):
@@ -15,6 +16,7 @@ def read(ds18b20):
         temperature = float(temperaturedata[2:])
         celsius = temperature / 1000
         farenheit = (celsius * 1.8) + 32
+        farenheit += 2 # adding offset to account for inaccuracy in probe
     except FileNotFoundError:
         farenheit = 500.0
 
@@ -49,11 +51,13 @@ def lcd_write(line_1, line_2):
         LCD.write_string(line_2.ljust(16))
 
 def log(message):
+    print(message)
     logging.info(message)
 
 if __name__ == '__main__':
     try:
-        GPIO.cleanup()
+
+        GPIO.setwarnings(False)
 
         logging.basicConfig(filename='./logs/controller.log', format='%(asctime)s: %(levelname)s: %(message)s', level=logging.INFO, datefmt='%m/%d/%Y %I:%M:%S %p')
 
@@ -78,16 +82,18 @@ if __name__ == '__main__':
 
             if current_temp == 500.0:
                 state_readout = 'Sensor Error'
-                log("Sensor error, shutting down heater")
+                log("Sensor error, shutting down heater, " + str(current_temp))
             else:
                 state_readout = 'Monitoring Temp'
-                log("Temperature is good, nothing to do")
+                log("Temperature is good, nothing to do, " + str(current_temp))
         else:
             start_heater()
             state_readout = 'Heater On'
-            log("Temperature is low, turning heater on")
+            log("Temperature is low, turning heater on, " + str(current_temp))
 
         lcd_write(temp_readout, state_readout)
+        time.sleep(270)
+        GPIO.cleanup()
 
     except KeyboardInterrupt:
         GPIO.cleanup()
