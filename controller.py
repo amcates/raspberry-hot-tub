@@ -74,7 +74,7 @@ if __name__ == '__main__':
         # get current temperature and turn on/off heater as necessary
         current_temp = get_temp()
 
-        temp_readout = str(current_temp) + chr(223) + "F"
+        temp_readout = str(current_temp) + chr(223) + "F " + time.strftime("%H:%M")
         state_readout = 'Error'
 
         if current_temp >= MAX_TEMP:
