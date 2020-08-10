@@ -16,7 +16,7 @@ def read(ds18b20):
         temperature = float(temperaturedata[2:])
         celsius = temperature / 1000
         farenheit = (celsius * 1.8) + 32
-        farenheit += 2 # adding offset to account for inaccuracy in probe
+        farenheit += 3 # adding offset to account for inaccuracy in probe
     except FileNotFoundError:
         farenheit = 500.0
 
